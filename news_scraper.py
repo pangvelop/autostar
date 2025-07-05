@@ -1,6 +1,51 @@
+import requests
+from bs4 import BeautifulSoup
+
+def get_naver_sports_news():
+    url = "https://sports.news.naver.com/index"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, "html.parser")
+
+    news_items = []
+    for item in soup.select(".today_item .text"):
+        title = item.get_text(strip=True)
+        link = item.a['href']
+        summary = fetch_naver_article_summary("https://sports.news.naver.com" + link)
+        news_items.append({"title": title, "summary": summary})
+        if len(news_items) >= 3:
+            break
+    return news_items
+
+def fetch_naver_article_summary(article_url):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(article_url, headers=headers)
+        soup = BeautifulSoup(res.text, "html.parser")
+        content = soup.select_one(".news_end").get_text(strip=True)
+        return content[:100] + "..." if content else "기사 내용을 불러오지 못했습니다."
+    except:
+        return "요약 실패"
+
+def get_espn_headlines():
+    url = "https://www.espn.com/"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, "html.parser")
+
+    news_items = []
+    for item in soup.select("section[class*='headlineStack'] li"):
+        title = item.get_text(strip=True)
+        link = item.a['href'] if item.a else "#"
+        news_items.append({
+            "title": title,
+            "summary": f"해외 스포츠 이슈: {title}",
+        })
+        if len(news_items) >= 3:
+            break
+    return news_items
+
 def get_daily_news():
-    # 실제 구현에서는 네이버/ESPN에서 크롤링
-    return [
-        {"title": "손흥민, 시즌 15호골 작렬!", "summary": "토트넘의 손흥민이 리그 15호골을 기록하며 팀 승리에 기여했다."},
-        {"title": "류현진, 복귀전 완봉승!", "summary": "부상에서 복귀한 류현진이 완벽한 피칭으로 완봉승을 거뒀다."}
-    ]
+    domestic = get_naver_sports_news()
+    international = get_espn_headlines()
+    return domestic + international
