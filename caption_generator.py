@@ -1,48 +1,39 @@
 import os
-import time
-from openai import OpenAI
-from dotenv import load_dotenv
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
-# .env 파일 로드
-load_dotenv()
+# 모델과 토크나이저 로드
+model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+tokenizer = AutoTokenizer.from_pretrained(model_id, token=hf_token)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    token=hf_token,
+    device_map="auto",  # GPU 자동 할당
+    torch_dtype=torch.float16,
+)
 
-# 환경변수에서 API 키 불러오기
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# 텍스트 생성 파이프라인 설정
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=300,
+    temperature=0.7,
+    top_p=0.95,
+    repetition_penalty=1.1
+)
 
-def generate_captions(news_items):
-    results = []
-    for item in news_items:
-        prompt = create_prompt(item["title"], item["summary"])
-        caption = call_gpt(prompt)
-        results.append(caption)
-        time.sleep(1)
-    return results
+def generate_caption(title, summary):
+    prompt = f"""
+You are a sports journalist creating short and engaging Instagram-style news posts.
 
-def create_prompt(title, summary):
-    return f"""
-너는 스포츠 기자야. 아래 뉴스 제목과 요약을 참고해서 **짧은 기사 형식으로 인스타그램에 올릴 콘텐츠를 작성**해줘.
+Write a stylish short paragraph (in <100 words) based on the following:
 
-조건은 다음과 같아:
-- 형식: [제목] → [본문] → [해시태그]
-- 전체 3~5문장 이내
-- 첫 줄은 제목 (뉴스 제목 그대로 쓰되 📣 붙이기)
-- 본문은 기사 느낌으로, 간결한 문장 중심
-- 마지막 줄에 한글 해시태그 5개 포함
+Title: {title}
+Summary: {summary}
 
-[제목]
-{title}
-
-[요약]
-{summary}
+Instagram Post:
 """
-
-def call_gpt(prompt):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # 또는 gpt-3.5-turbo
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"GPT 호출 실패: {e}"
+    outputs = generator(prompt, do_sample=True)
+    return outputs[0]["generated_text"].split("Instagram Post:")[-1].strip()
