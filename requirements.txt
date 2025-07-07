@@ -1,2 +1,4 @@
+openai
+requests
+beautifulsoup4
 Pillow
-BeautifulSoup
