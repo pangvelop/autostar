@@ -19,3 +19,5 @@ captions = generate_captions(news_items)
 create_image_cards(news_items, captions, output_dir)
 
 print(f"총 {len(news_items)}개의 인스타 콘텐츠가 생성되었습니다.")
+
+
