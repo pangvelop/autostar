@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import os
 from functools import lru_cache
-from typing import Iterable, List
+from typing import Iterable, List, TYPE_CHECKING, Any
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, Pipeline, pipeline
+if TYPE_CHECKING:  # pragma: no cover - import for typing only
+    from transformers import Pipeline
+else:  # pragma: no cover - runtime fallback when transformers isn't available
+    Pipeline = Any
 
 from news_scraper import NewsItem
 
@@ -33,12 +35,22 @@ def _prompt_from_item(item: NewsItem) -> str:
 
 
 @lru_cache(maxsize=1)
-def _load_pipeline() -> Pipeline:
+def _load_pipeline() -> "Pipeline":
     token = os.getenv(HF_TOKEN_ENV_VAR)
     if not token:
         raise CaptionGenerationError(
             "HuggingFace token not provided. Set the HUGGINGFACEHUB_API_TOKEN environment variable."
         )
+
+    try:
+        from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+    except ImportError as exc:  # pragma: no cover - depends on optional deps
+        raise CaptionGenerationError("transformers package is not installed") from exc
+
+    try:
+        import torch
+    except ImportError as exc:  # pragma: no cover - depends on optional deps
+        raise CaptionGenerationError("torch package is not installed") from exc
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=token)
